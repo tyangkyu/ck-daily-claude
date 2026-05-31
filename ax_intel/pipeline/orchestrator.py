@@ -66,24 +66,33 @@ def collect_step(context: RunContext) -> Tuple[List[Path], str]:
     discovered_at = context.created_at
     cutoff_at = discovered_at - timedelta(hours=context.collection_window_hours)
     collected: List[RawItem] = []
+    errors: List[str] = []
     for feed in sources_config.get("rss_feeds", []):
         if context.dry_run and not feed.get("offline_only", False):
             continue
         if not context.dry_run and feed.get("offline_only", False):
             continue
-        collected.extend(
-            collect_rss_feed(
-                feed_url=feed["url"],
-                source_name=feed["name"],
-                source_tier=feed["tier"],
-                default_companies=feed.get("companies", []),
-                default_scope=feed.get("scope", []),
-                discovered_at=discovered_at,
-                cutoff_at=cutoff_at,
+        try:
+            collected.extend(
+                collect_rss_feed(
+                    feed_url=feed["url"],
+                    source_name=feed["name"],
+                    source_tier=feed["tier"],
+                    default_companies=feed.get("companies", []),
+                    default_scope=feed.get("scope", []),
+                    discovered_at=discovered_at,
+                    cutoff_at=cutoff_at,
+                )
             )
-        )
+        except Exception as exc:
+            errors.append(f"{feed['name']}: {exc}")
+    if not collected:
+        raise RuntimeError(f"No items collected. Feed errors: {errors}")
     write_json(context.output_paths["raw_items"], [item.model_dump(mode="json") for item in collected])
-    return [context.output_paths["raw_items"]], f"Collected {len(collected)} raw items"
+    msg = f"Collected {len(collected)} raw items"
+    if errors:
+        msg += f" ({len(errors)} feeds skipped)"
+    return [context.output_paths["raw_items"]], msg
 
 
 def clean_step(context: RunContext) -> Tuple[List[Path], str]:

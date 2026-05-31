@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 from email.utils import parsedate_to_datetime
 from pathlib import Path
 from typing import Iterable, List, Optional
-from urllib.request import urlopen
+from urllib.request import Request, urlopen
 from xml.etree import ElementTree
 
 from ax_intel.config import PROJECT_ROOT
@@ -33,7 +33,8 @@ def read_feed_text(feed_url: str) -> str:
     if candidate.exists():
         return candidate.read_text(encoding="utf-8")
 
-    with urlopen(feed_url, timeout=20) as response:
+    req = Request(feed_url, headers={"User-Agent": "Mozilla/5.0 (compatible; AXCommerceIntel/1.0)"})
+    with urlopen(req, timeout=20) as response:
         return response.read().decode("utf-8")
 
 
