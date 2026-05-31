@@ -7,14 +7,13 @@ from typing import Callable, List
 from ax_intel.io import read_json
 from ax_intel.models import (
     CleanItem,
-    EmailDraftPreview,
     HeroStory,
     Insight,
     RawItem,
     ReportManifest,
     RunContext,
-    SendResult,
     Signal,
+    SlackSendResult,
     ValidationCheck,
     ValidationResult,
 )
@@ -36,8 +35,7 @@ REQUIRED_OUTPUT_KEYS = [
     "slack_message",
     "archive_markdown",
     "report_manifest",
-    "email_draft_preview",
-    "email_send_result",
+    "slack_send_result",
 ]
 
 
@@ -68,8 +66,7 @@ def validate_json_contracts(context: RunContext) -> str:
     Insight.model_validate(read_json(context.output_paths["insights"])[0])
     HeroStory.model_validate(read_json(context.output_paths["hero_story"]))
     ReportManifest.model_validate(read_json(context.output_paths["report_manifest"]))
-    EmailDraftPreview.model_validate(read_json(context.output_paths["email_draft_preview"]))
-    SendResult.model_validate(read_json(context.output_paths["email_send_result"]))
+    SlackSendResult.model_validate(read_json(context.output_paths["slack_send_result"]))
     return "JSON contracts are valid"
 
 
@@ -99,11 +96,11 @@ def validate_email_html(context: RunContext) -> str:
     return "Email HTML contains required blocks"
 
 
-def validate_recipients(context: RunContext) -> str:
-    preview = EmailDraftPreview.model_validate(read_json(context.output_paths["email_draft_preview"]))
-    if len(preview.recipients) != 5:
-        raise ValueError("Expected exactly 5 recipients")
-    return "Recipient list contains exactly 5 recipients"
+def validate_slack_result(context: RunContext) -> str:
+    result = SlackSendResult.model_validate(read_json(context.output_paths["slack_send_result"]))
+    if not result.status:
+        raise ValueError("Slack send result has no status")
+    return f"Slack distribution status: {result.status}"
 
 
 def validate_report_exports(context: RunContext) -> str:
@@ -123,7 +120,7 @@ def run_validation(context: RunContext) -> ValidationResult:
         _check("top_signals", lambda: validate_top_signals(context)),
         _check("source_urls", lambda: validate_source_urls(context)),
         _check("email_html", lambda: validate_email_html(context)),
-        _check("recipients", lambda: validate_recipients(context)),
+        _check("slack_result", lambda: validate_slack_result(context)),
         _check("report_exports", lambda: validate_report_exports(context)),
     ]
     return ValidationResult(

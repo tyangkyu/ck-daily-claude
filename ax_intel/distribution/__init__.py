@@ -1,2 +1,1 @@
-"""Distribution utilities for Gmail draft workflow."""
-
+"""Distribution utilities for Gmail and Slack workflows."""

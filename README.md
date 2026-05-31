@@ -12,6 +12,7 @@ PR #9 adds the Phase 9 Gmail draft skeleton.
 PR #10 adds the Phase 10 validation engine skeleton.
 PR #11 adds the Phase 11 end-to-end daily pipeline skeleton.
 PR #12 adds a Slack-ready message artifact for the ck-daily PoC.
+PR #13 adds Slack upload/send-result plumbing for PoC distribution.
 
 ## Scope
 
@@ -42,6 +43,8 @@ PR #12 adds a Slack-ready message artifact for the ck-daily PoC.
 - `daily_pipeline.py` CLI
 - Slack-ready message generation
 - `render_slack_message.py` CLI
+- Slack dry-run/live upload skeleton
+- `send_slack.py` CLI
 
 Later phases will add real Gmail API integration and production scheduling.
 
@@ -59,7 +62,7 @@ python3 scripts/generate_insights.py --run-context Reports/2026-05-31/run-contex
 python3 scripts/generate_hero_visual.py --run-context Reports/2026-05-31/run-context.json
 python3 scripts/render_report.py --run-context Reports/2026-05-31/run-context.json
 python3 scripts/render_slack_message.py --run-context Reports/2026-05-31/run-context.json
-python3 scripts/send_gmail.py --run-context Reports/2026-05-31/run-context.json
+python3 scripts/send_slack.py --run-context Reports/2026-05-31/run-context.json
 python3 scripts/validate_outputs.py --run-context Reports/2026-05-31/run-context.json
 pytest
 ```
@@ -71,3 +74,4 @@ python3 scripts/daily_pipeline.py --date 2026-05-31 --dry-run
 ```
 
 `send_gmail.py` is draft-only by default. `--mode send` is currently a guarded stub and requires `--approval-token`.
+`send_slack.py` is dry-run safe by default. Live Slack posting requires `SLACK_BOT_TOKEN` and `SLACK_CHANNEL_ID`.

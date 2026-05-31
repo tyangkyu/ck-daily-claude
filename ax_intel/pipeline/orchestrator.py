@@ -1,13 +1,12 @@
 from __future__ import annotations
 
-from datetime import date, datetime, timezone
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Callable, List, Optional, Tuple
 
 from ax_intel.cleaning.pipeline import clean_items
-from ax_intel.distribution.gmail_draft import build_send_result, create_draft_preview
-from ax_intel.distribution.recipients import load_recipients
 from ax_intel.distribution.slack_message import render_slack_message
+from ax_intel.distribution.slack_upload import upload_slack
 from ax_intel.insights.writer import generate_phase6_outputs
 from ax_intel.io import read_json, write_json
 from ax_intel.models import (
@@ -161,22 +160,10 @@ def slack_message_step(context: RunContext) -> Tuple[List[Path], str]:
     return [context.output_paths["slack_message"]], "Rendered Slack message artifact"
 
 
-def distribution_step(context: RunContext, mode: RunMode, approval_token: Optional[str]) -> Tuple[List[Path], str]:
-    recipients = load_recipients()
-    preview = create_draft_preview(context, recipients)
-    send_result = build_send_result(
-        context=context,
-        recipients=recipients,
-        mode=mode,
-        draft_id=preview.draft_id,
-        approval_token=approval_token,
-    )
-    write_json(context.output_paths["email_draft_preview"], preview.model_dump(mode="json"))
-    write_json(context.output_paths["email_send_result"], send_result.model_dump(mode="json"))
-    return [
-        context.output_paths["email_draft_preview"],
-        context.output_paths["email_send_result"],
-    ], send_result.status
+def slack_upload_step(context: RunContext) -> Tuple[List[Path], str]:
+    result = upload_slack(context)
+    write_json(context.output_paths["slack_send_result"], result.model_dump(mode="json"))
+    return [context.output_paths["slack_send_result"]], result.status
 
 
 def validation_step(context: RunContext) -> Tuple[List[Path], str]:
@@ -189,7 +176,7 @@ def run_pipeline(
     *,
     context: RunContext,
     mode: RunMode,
-    approval_token: Optional[str] = None,
+    approval_token: Optional[str] = None,  # noqa: ARG001 — retained for API compatibility
 ) -> RunLog:
     pipeline_started_at = _now()
     context.report_dir.mkdir(parents=True, exist_ok=True)
@@ -213,7 +200,7 @@ def run_pipeline(
         ("generate_hero_visual", lambda: hero_visual_step(context)),
         ("render_report", lambda: report_step(context)),
         ("render_slack_message", lambda: slack_message_step(context)),
-        ("send_gmail", lambda: distribution_step(context, mode, approval_token)),
+        ("send_slack", lambda: slack_upload_step(context)),
         ("validate_outputs", lambda: validation_step(context)),
     ]
     for name, fn in planned_steps:

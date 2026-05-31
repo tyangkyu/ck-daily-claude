@@ -37,7 +37,7 @@ def run_pipeline_to_distribution(tmp_path: Path) -> Path:
         "generate_hero_visual.py",
         "render_report.py",
         "render_slack_message.py",
-        "send_gmail.py",
+        "send_slack.py",
     ]:
         subprocess.run(
             [

@@ -47,10 +47,10 @@ def test_daily_pipeline_runs_end_to_end(tmp_path: Path) -> None:
         "generate_hero_visual",
         "render_report",
         "render_slack_message",
-        "send_gmail",
+        "send_slack",
         "validate_outputs",
     ]
     assert all(step.status == "completed" for step in run_log.steps)
-    assert (tmp_path / "2026-05-31" / "email-draft-preview.json").exists()
+    assert (tmp_path / "2026-05-31" / "slack-send-result.json").exists()
     assert (tmp_path / "2026-05-31" / "slack-message.md").exists()
     assert (tmp_path / "2026-05-31" / "report.pdf").exists()

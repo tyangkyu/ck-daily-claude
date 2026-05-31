@@ -33,6 +33,7 @@ OUTPUT_FILES = {
     "report_manifest": "report-manifest.json",
     "email_draft_preview": "email-draft-preview.json",
     "email_send_result": "email-send-result.json",
+    "slack_send_result": "slack-send-result.json",
     "validation_result": "validation-result.json",
     "run_log": "run-log.json",
 }
