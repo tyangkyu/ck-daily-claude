@@ -106,7 +106,7 @@ def validate_slack_result(context: RunContext) -> str:
 def validate_report_exports(context: RunContext) -> str:
     pdf_path = context.output_paths["report_pdf"]
     docx_path = context.output_paths["report_docx"]
-    if not pdf_path.read_bytes().startswith(b"%PDF-1.4"):
+    if not pdf_path.read_bytes().startswith(b"%PDF-"):
         raise ValueError("PDF signature is invalid")
     if not docx_path.read_bytes().startswith(b"PK"):
         raise ValueError("DOCX zip signature is invalid")

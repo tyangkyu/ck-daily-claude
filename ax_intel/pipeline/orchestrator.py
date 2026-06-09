@@ -31,6 +31,10 @@ from ax_intel.scoring.ranker import score_items
 from ax_intel.source_clients.rss import collect_rss_feed
 from ax_intel.config import load_config
 from ax_intel.validation.engine import run_validation
+from ax_intel.visuals.dalle_generator import generate_dalle_image
+from ax_intel.visuals.newsletter_image import generate_newsletter_image
+from ax_intel.visuals.pollinations_generator import generate_pollinations_image
+from ax_intel.visuals.replicate_generator import generate_replicate_image
 from ax_intel.visuals.placeholder_png import write_solid_png
 from ax_intel.visuals.prompt import build_hero_prompt
 
@@ -121,10 +125,41 @@ def insights_step(context: RunContext) -> Tuple[List[Path], str]:
 def hero_visual_step(context: RunContext) -> Tuple[List[Path], str]:
     hero_story = HeroStory.model_validate(read_json(context.output_paths["hero_story"]))
     signals = [Signal.model_validate(signal) for signal in read_json(context.output_paths["signals"])]
+    signal_lookup = {s.item_id: s for s in signals}
+    hero_signal = signal_lookup.get(hero_story.signal_id, signals[0])
     prompt = build_hero_prompt(hero_story, signals, context.run_date)
     context.output_paths["hero_prompt"].write_text(prompt, encoding="utf-8")
-    write_solid_png(context.output_paths["hero_image"], size=(1600, 900))
-    return [context.output_paths["hero_prompt"], context.output_paths["hero_image"]], "Generated hero prompt and placeholder image"
+
+    # 이미지 생성: 1) DALL-E 3  2) Replicate Flux  3) Pillow 뉴스레터  4) 단색 placeholder
+    run_date_str = context.run_date.strftime("%Y.%m.%d")
+    img_kwargs = dict(
+        hero_title=hero_story.title,
+        visual_message=hero_story.visual_message,
+        run_date=run_date_str,
+        output_path=context.output_paths["hero_image"],
+    )
+
+    # DALL-E가 유효하면 사용, 아니면 바로 Pillow (무료)
+    if generate_dalle_image(**img_kwargs):
+        img_note = "DALL-E 3 hero image"
+    else:
+        # Pillow 뉴스레터 스타일 (기본, 무료)
+        try:
+            generate_newsletter_image(
+                hero_title=hero_story.title,
+                priority=hero_signal.priority,
+                total_score=hero_signal.total_score,
+                scores=hero_signal.scores.model_dump(),
+                signals=[s.model_dump() for s in signals],
+                run_date=run_date_str,
+                output_path=context.output_paths["hero_image"],
+            )
+            img_note = "newsletter-style hero image (Pillow)"
+        except Exception as exc:
+            write_solid_png(context.output_paths["hero_image"], size=(1600, 900))
+            img_note = f"placeholder (fallback: {exc})"
+
+    return [context.output_paths["hero_prompt"], context.output_paths["hero_image"]], f"Generated hero prompt and {img_note}"
 
 
 def report_step(context: RunContext) -> Tuple[List[Path], str]:

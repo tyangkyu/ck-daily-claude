@@ -72,10 +72,5 @@ def render_slack_message(
 *핵심 권고*
 {immediate_actions}
 
-*산출물*
-{canvas_line}- PDF: {manifest.pdf_path.name if manifest.pdf_path else "report.pdf"}
-- Markdown: {manifest.markdown_path.name if manifest.markdown_path else "report.md"}
-- HTML Email: {manifest.html_email_path.name if manifest.html_email_path else "email.html"}
-
-_현재 PoC는 Slack 커넥터 제약으로 로컬 파일을 직접 첨부하지 않고, 본문/스레드/Canvas 링크로 전달한다._
+_Hero Image · PDF 리포트가 스레드에 첨부됩니다._
 """
