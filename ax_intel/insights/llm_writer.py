@@ -93,19 +93,24 @@ def _call_anthropic(run_date: date, brief: str, model: str, api_key: str) -> Dai
     client = anthropic.Anthropic(api_key=api_key)
     resp = client.messages.create(
         model=model,
-        max_tokens=2000,
+        max_tokens=4096,
         temperature=0.4,
         system=SYSTEM_PROMPT,
         messages=[{"role": "user", "content": _build_user_prompt(run_date, brief)}],
     )
     text = "".join(block.text for block in resp.content if getattr(block, "type", "") == "text").strip()
+    if resp.stop_reason == "max_tokens":
+        raise ValueError("LLM response truncated (max_tokens). 한도를 늘리세요.")
 
-    # JSON 추출 (모델이 코드블록을 붙였을 경우 대비)
+    # JSON 추출: 코드블록 제거 후 첫 '{' ~ 마지막 '}' 구간만 파싱
     if text.startswith("```"):
         text = text.split("```", 2)[1]
         if text.startswith("json"):
             text = text[4:]
         text = text.strip()
+    start, end = text.find("{"), text.rfind("}")
+    if start != -1 and end != -1 and end > start:
+        text = text[start : end + 1]
     data = json.loads(text)
 
     return DailyAnalysis(
