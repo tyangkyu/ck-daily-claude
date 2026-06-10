@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -73,3 +74,42 @@ def test_send_slack_creates_send_result_in_dry_run(tmp_path: Path) -> None:
     assert send_result.status == "dry_run"
     assert send_result.channel_id
     assert send_result.run_date.isoformat() == "2026-05-31"
+
+
+def test_send_slack_fails_without_token_in_send_mode(tmp_path: Path) -> None:
+    init_result = subprocess.run(
+        [
+            sys.executable,
+            str(ROOT / "scripts" / "init_run.py"),
+            "--date",
+            "2026-05-31",
+            "--mode",
+            "send",
+            "--reports-dir",
+            str(tmp_path),
+        ],
+        cwd=ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    run_context_path = Path(init_result.stdout.strip())
+    env = os.environ.copy()
+    env["SLACK_BOT_TOKEN"] = ""
+    env["SLACK_CHANNEL_ID"] = "C_TEST"
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(ROOT / "scripts" / "send_slack.py"),
+            "--run-context",
+            str(run_context_path),
+        ],
+        cwd=ROOT,
+        env=env,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode != 0
+    assert "SLACK_BOT_TOKEN is required for --mode send" in result.stderr
