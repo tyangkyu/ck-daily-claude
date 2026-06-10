@@ -7,8 +7,8 @@ from typing import Callable, List
 from ax_intel.io import read_json
 from ax_intel.models import (
     CleanItem,
+    DailyAnalysis,
     HeroStory,
-    Insight,
     RawItem,
     ReportManifest,
     RunContext,
@@ -24,10 +24,8 @@ REQUIRED_OUTPUT_KEYS = [
     "raw_items",
     "clean_items",
     "signals",
-    "insights",
+    "daily_analysis",
     "hero_story",
-    "hero_prompt",
-    "hero_image",
     "report_markdown",
     "report_docx",
     "report_pdf",
@@ -63,7 +61,7 @@ def validate_json_contracts(context: RunContext) -> str:
     RawItem.model_validate(read_json(context.output_paths["raw_items"])[0])
     CleanItem.model_validate(read_json(context.output_paths["clean_items"])[0])
     Signal.model_validate(read_json(context.output_paths["signals"])[0])
-    Insight.model_validate(read_json(context.output_paths["insights"])[0])
+    DailyAnalysis.model_validate(read_json(context.output_paths["daily_analysis"]))
     HeroStory.model_validate(read_json(context.output_paths["hero_story"]))
     ReportManifest.model_validate(read_json(context.output_paths["report_manifest"]))
     SlackSendResult.model_validate(read_json(context.output_paths["slack_send_result"]))
@@ -89,7 +87,7 @@ def validate_source_urls(context: RunContext) -> str:
 
 def validate_email_html(context: RunContext) -> str:
     html = context.output_paths["email_html"].read_text(encoding="utf-8")
-    required = ["ck-daily", "요약", "Top 전략 신호", "핵심 권고"]
+    required = ["AX Commerce Intelligence", "핵심 요약", "주목해야 할 변화", "향후 전망"]
     missing = [item for item in required if item not in html]
     if missing:
         raise ValueError(f"Email HTML missing: {', '.join(missing)}")

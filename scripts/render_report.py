@@ -10,7 +10,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from ax_intel.io import read_json, write_json
-from ax_intel.models import HeroStory, Insight, RunContext, Signal
+from ax_intel.models import DailyAnalysis, HeroStory, RunContext, Signal
 from ax_intel.reporting.exporters import write_docx, write_pdf
 from ax_intel.reporting.renderer import (
     build_manifest,
@@ -30,25 +30,25 @@ def main() -> int:
     args = parse_args()
     context = RunContext.model_validate(read_json(args.run_context))
     signals = [Signal.model_validate(signal) for signal in read_json(context.output_paths["signals"])]
-    insights = [Insight.model_validate(insight) for insight in read_json(context.output_paths["insights"])]
+    analysis = DailyAnalysis.model_validate(read_json(context.output_paths["daily_analysis"]))
     hero_story = HeroStory.model_validate(read_json(context.output_paths["hero_story"]))
 
     report_markdown = render_report_markdown(
         context=context,
         signals=signals,
-        insights=insights,
+        analysis=analysis,
         hero_story=hero_story,
     )
     email_html = render_email_html(
         context=context,
         signals=signals,
-        insights=insights,
+        analysis=analysis,
         hero_story=hero_story,
     )
     archive_markdown = render_archive_markdown(
         context=context,
         signals=signals,
-        insights=insights,
+        analysis=analysis,
         hero_story=hero_story,
     )
     manifest = build_manifest(context)

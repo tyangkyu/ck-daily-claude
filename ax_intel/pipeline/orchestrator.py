@@ -11,8 +11,8 @@ from ax_intel.insights.writer import generate_phase6_outputs
 from ax_intel.io import read_json, write_json
 from ax_intel.models import (
     CleanItem,
+    DailyAnalysis,
     HeroStory,
-    Insight,
     PipelineStepResult,
     RawItem,
     RunContext,
@@ -31,12 +31,6 @@ from ax_intel.scoring.ranker import score_items
 from ax_intel.source_clients.rss import collect_rss_feed
 from ax_intel.config import load_config
 from ax_intel.validation.engine import run_validation
-from ax_intel.visuals.dalle_generator import generate_dalle_image
-from ax_intel.visuals.newsletter_image import generate_newsletter_image
-from ax_intel.visuals.pollinations_generator import generate_pollinations_image
-from ax_intel.visuals.replicate_generator import generate_replicate_image
-from ax_intel.visuals.placeholder_png import write_solid_png
-from ax_intel.visuals.prompt import build_hero_prompt
 
 
 def _now() -> datetime:
@@ -64,11 +58,18 @@ def _record_step(name: str, fn: Callable[[], Tuple[List[Path], str]]) -> Pipelin
 
 
 def collect_step(context: RunContext) -> Tuple[List[Path], str]:
-    from datetime import timedelta
+    from datetime import time as dt_time, timedelta
 
     sources_config = load_config("sources.yaml")
     discovered_at = context.created_at
-    cutoff_at = discovered_at - timedelta(hours=context.collection_window_hours)
+    # dry-run(고정 fixture)에서는 벽시계 시각 대신 run_date를 기준으로 컷오프를 잡아
+    # 시간이 지나도 결과가 결정론적으로 유지되도록 한다.
+    cutoff_reference = (
+        datetime.combine(context.run_date, dt_time(23, 59, 59), tzinfo=timezone.utc)
+        if context.dry_run
+        else discovered_at
+    )
+    cutoff_at = cutoff_reference - timedelta(hours=context.collection_window_hours)
     collected: List[RawItem] = []
     errors: List[str] = []
     for feed in sources_config.get("rss_feeds", []):
@@ -116,59 +117,27 @@ def score_step(context: RunContext) -> Tuple[List[Path], str]:
 def insights_step(context: RunContext) -> Tuple[List[Path], str]:
     cleaned = [CleanItem.model_validate(item) for item in read_json(context.output_paths["clean_items"])]
     signals = [Signal.model_validate(signal) for signal in read_json(context.output_paths["signals"])]
-    insights, hero_story = generate_phase6_outputs(signals, cleaned)
-    write_json(context.output_paths["insights"], [insight.model_dump(mode="json") for insight in insights])
-    write_json(context.output_paths["hero_story"], hero_story.model_dump(mode="json"))
-    return [context.output_paths["insights"], context.output_paths["hero_story"]], f"Generated {len(insights)} insights"
-
-
-def hero_visual_step(context: RunContext) -> Tuple[List[Path], str]:
-    hero_story = HeroStory.model_validate(read_json(context.output_paths["hero_story"]))
-    signals = [Signal.model_validate(signal) for signal in read_json(context.output_paths["signals"])]
-    signal_lookup = {s.item_id: s for s in signals}
-    hero_signal = signal_lookup.get(hero_story.signal_id, signals[0])
-    prompt = build_hero_prompt(hero_story, signals, context.run_date)
-    context.output_paths["hero_prompt"].write_text(prompt, encoding="utf-8")
-
-    # 이미지 생성: 1) DALL-E 3  2) Replicate Flux  3) Pillow 뉴스레터  4) 단색 placeholder
-    run_date_str = context.run_date.strftime("%Y.%m.%d")
-    img_kwargs = dict(
-        hero_title=hero_story.title,
-        visual_message=hero_story.visual_message,
-        run_date=run_date_str,
-        output_path=context.output_paths["hero_image"],
+    analysis, hero_story = generate_phase6_outputs(
+        signals,
+        cleaned,
+        run_date=context.run_date,
+        use_llm=not context.dry_run,
     )
-
-    # DALL-E가 유효하면 사용, 아니면 바로 Pillow (무료)
-    if generate_dalle_image(**img_kwargs):
-        img_note = "DALL-E 3 hero image"
-    else:
-        # Pillow 뉴스레터 스타일 (기본, 무료)
-        try:
-            generate_newsletter_image(
-                hero_title=hero_story.title,
-                priority=hero_signal.priority,
-                total_score=hero_signal.total_score,
-                scores=hero_signal.scores.model_dump(),
-                signals=[s.model_dump() for s in signals],
-                run_date=run_date_str,
-                output_path=context.output_paths["hero_image"],
-            )
-            img_note = "newsletter-style hero image (Pillow)"
-        except Exception as exc:
-            write_solid_png(context.output_paths["hero_image"], size=(1600, 900))
-            img_note = f"placeholder (fallback: {exc})"
-
-    return [context.output_paths["hero_prompt"], context.output_paths["hero_image"]], f"Generated hero prompt and {img_note}"
+    write_json(context.output_paths["daily_analysis"], analysis.model_dump(mode="json"))
+    write_json(context.output_paths["hero_story"], hero_story.model_dump(mode="json"))
+    return (
+        [context.output_paths["daily_analysis"], context.output_paths["hero_story"]],
+        f"Generated daily analysis ({analysis.generated_by})",
+    )
 
 
 def report_step(context: RunContext) -> Tuple[List[Path], str]:
     signals = [Signal.model_validate(signal) for signal in read_json(context.output_paths["signals"])]
-    insights = [Insight.model_validate(insight) for insight in read_json(context.output_paths["insights"])]
+    analysis = DailyAnalysis.model_validate(read_json(context.output_paths["daily_analysis"]))
     hero_story = HeroStory.model_validate(read_json(context.output_paths["hero_story"]))
-    report_markdown = render_report_markdown(context=context, signals=signals, insights=insights, hero_story=hero_story)
-    email_html = render_email_html(context=context, signals=signals, insights=insights, hero_story=hero_story)
-    archive_markdown = render_archive_markdown(context=context, signals=signals, insights=insights, hero_story=hero_story)
+    report_markdown = render_report_markdown(context=context, signals=signals, analysis=analysis, hero_story=hero_story)
+    email_html = render_email_html(context=context, signals=signals, analysis=analysis, hero_story=hero_story)
+    archive_markdown = render_archive_markdown(context=context, signals=signals, analysis=analysis, hero_story=hero_story)
     manifest = build_manifest(context)
     context.output_paths["report_markdown"].write_text(report_markdown, encoding="utf-8")
     context.output_paths["email_html"].write_text(email_html, encoding="utf-8")
@@ -189,13 +158,13 @@ def report_step(context: RunContext) -> Tuple[List[Path], str]:
 def slack_message_step(context: RunContext) -> Tuple[List[Path], str]:
     signals = [Signal.model_validate(signal) for signal in read_json(context.output_paths["signals"])]
     clean_items = [CleanItem.model_validate(item) for item in read_json(context.output_paths["clean_items"])]
-    insights = [Insight.model_validate(insight) for insight in read_json(context.output_paths["insights"])]
+    analysis = DailyAnalysis.model_validate(read_json(context.output_paths["daily_analysis"]))
     hero_story = HeroStory.model_validate(read_json(context.output_paths["hero_story"]))
     manifest = build_manifest(context)
     message = render_slack_message(
         context=context,
         signals=signals,
-        insights=insights,
+        analysis=analysis,
         hero_story=hero_story,
         manifest=manifest,
         clean_items=clean_items,
@@ -241,7 +210,6 @@ def run_pipeline(
         ("clean_and_rank_sources", lambda: clean_step(context)),
         ("score_signals", lambda: score_step(context)),
         ("generate_insights", lambda: insights_step(context)),
-        ("generate_hero_visual", lambda: hero_visual_step(context)),
         ("render_report", lambda: report_step(context)),
         ("render_slack_message", lambda: slack_message_step(context)),
         ("send_slack", lambda: slack_upload_step(context)),

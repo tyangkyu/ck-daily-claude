@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import argparse
 import sys
-from datetime import timedelta
+from datetime import datetime, time as dt_time, timedelta, timezone
 from pathlib import Path
 from typing import List
 
@@ -26,7 +26,12 @@ def parse_args() -> argparse.Namespace:
 def collect_from_config(context: RunContext) -> List[RawItem]:
     sources_config = load_config("sources.yaml")
     discovered_at = context.created_at
-    cutoff_at = discovered_at - timedelta(hours=context.collection_window_hours)
+    cutoff_reference = (
+        datetime.combine(context.run_date, dt_time(23, 59, 59), tzinfo=timezone.utc)
+        if context.dry_run
+        else discovered_at
+    )
+    cutoff_at = cutoff_reference - timedelta(hours=context.collection_window_hours)
     collected: List[RawItem] = []
 
     offline_mode = context.dry_run

@@ -44,7 +44,6 @@ def test_daily_pipeline_runs_end_to_end(tmp_path: Path) -> None:
         "clean_and_rank_sources",
         "score_signals",
         "generate_insights",
-        "generate_hero_visual",
         "render_report",
         "render_slack_message",
         "send_slack",

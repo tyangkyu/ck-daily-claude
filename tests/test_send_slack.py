@@ -34,7 +34,6 @@ def run_pipeline_to_report(tmp_path: Path) -> Path:
         "clean_and_rank_sources.py",
         "score_signals.py",
         "generate_insights.py",
-        "generate_hero_visual.py",
         "render_report.py",
         "render_slack_message.py",
     ]:

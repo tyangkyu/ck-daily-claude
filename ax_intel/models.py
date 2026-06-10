@@ -102,27 +102,30 @@ class Signal(BaseContract):
         return self
 
 
-class RecommendedActions(BaseContract):
-    immediate: List[str] = Field(default_factory=list)
-    thirty_days: List[str] = Field(default_factory=list)
-    ninety_days: List[str] = Field(default_factory=list)
-
-
-class Insight(BaseContract):
-    signal_id: str = Field(min_length=1)
-    what_happened: str = Field(min_length=1)
-    why_it_matters: str = Field(min_length=1)
-    implication_for_korea: str = Field(min_length=1)
-    implication_for_lg: str = Field(min_length=1)
-    recommended_actions: RecommendedActions
-
-
 class HeroStory(BaseContract):
     signal_id: str = Field(min_length=1)
     title: str = Field(min_length=1)
     selection_reason: str = Field(min_length=1)
     alternative_signal_ids: List[str] = Field(default_factory=list)
-    visual_message: str = Field(min_length=1)
+
+
+class DailyAnalysis(BaseContract):
+    """텍스트 중심 데일리 분석 결과 (5단 구조).
+
+    1) core_summary       핵심 요약 (3~5줄)
+    2) key_changes        주목해야 할 변화
+    3) industry_insights  IT 산업 관점 핵심 인사이트 (3~5개)
+    4) korea_implications 국내 기업이 고려해야 할 시사점
+    5) outlook            향후 전망
+    """
+
+    run_date: date
+    core_summary: str = Field(min_length=1)
+    key_changes: List[str] = Field(min_length=1)
+    industry_insights: List[str] = Field(min_length=1)
+    korea_implications: List[str] = Field(min_length=1)
+    outlook: str = Field(min_length=1)
+    generated_by: str = "template"  # "template" | "llm"
 
 
 class ReportManifest(BaseContract):
@@ -175,7 +178,6 @@ class SlackSendResult(BaseContract):
     channel_id: str = Field(min_length=1)
     channel_name: str = ""
     message_ts: Optional[str] = None
-    hero_image_ts: Optional[str] = None
     pdf_ts: Optional[str] = None
     status: str = Field(min_length=1)
     sent_at: Optional[datetime] = None

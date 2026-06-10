@@ -11,7 +11,7 @@ if str(ROOT) not in sys.path:
 
 from ax_intel.distribution.slack_message import render_slack_message
 from ax_intel.io import read_json
-from ax_intel.models import CleanItem, HeroStory, Insight, ReportManifest, RunContext, Signal
+from ax_intel.models import CleanItem, DailyAnalysis, HeroStory, ReportManifest, RunContext, Signal
 
 
 def parse_args() -> argparse.Namespace:
@@ -25,14 +25,14 @@ def main() -> int:
     context = RunContext.model_validate(read_json(args.run_context))
     signals = [Signal.model_validate(signal) for signal in read_json(context.output_paths["signals"])]
     clean_items = [CleanItem.model_validate(item) for item in read_json(context.output_paths["clean_items"])]
-    insights = [Insight.model_validate(insight) for insight in read_json(context.output_paths["insights"])]
+    analysis = DailyAnalysis.model_validate(read_json(context.output_paths["daily_analysis"]))
     hero_story = HeroStory.model_validate(read_json(context.output_paths["hero_story"]))
     manifest = ReportManifest.model_validate(read_json(context.output_paths["report_manifest"]))
 
     message = render_slack_message(
         context=context,
         signals=signals,
-        insights=insights,
+        analysis=analysis,
         hero_story=hero_story,
         manifest=manifest,
         clean_items=clean_items,

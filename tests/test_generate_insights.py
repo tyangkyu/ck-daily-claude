@@ -5,7 +5,7 @@ import sys
 from pathlib import Path
 
 from ax_intel.io import read_json
-from ax_intel.models import HeroStory, Insight
+from ax_intel.models import DailyAnalysis, HeroStory
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -48,7 +48,7 @@ def run_pipeline_to_signals(tmp_path: Path) -> Path:
     return run_context_path
 
 
-def test_generate_insights_creates_insights_and_hero_story(tmp_path: Path) -> None:
+def test_generate_insights_creates_daily_analysis_and_hero_story(tmp_path: Path) -> None:
     run_context_path = run_pipeline_to_signals(tmp_path)
 
     result = subprocess.run(
@@ -65,25 +65,20 @@ def test_generate_insights_creates_insights_and_hero_story(tmp_path: Path) -> No
     )
     output_paths = [Path(line) for line in result.stdout.strip().splitlines()]
 
-    insights_path = tmp_path / "2026-05-31" / "insights.json"
+    analysis_path = tmp_path / "2026-05-31" / "daily-analysis.json"
     hero_story_path = tmp_path / "2026-05-31" / "hero-story.json"
-    assert output_paths == [insights_path, hero_story_path]
+    assert output_paths == [analysis_path, hero_story_path]
 
-    insights = [Insight.model_validate(item) for item in read_json(insights_path)]
+    analysis = DailyAnalysis.model_validate(read_json(analysis_path))
     hero_story = HeroStory.model_validate(read_json(hero_story_path))
 
-    assert len(insights) == 3
-    assert hero_story.signal_id in {insight.signal_id for insight in insights}
+    # dry-run은 LLM 호출 없이 결정론적 템플릿 폴백을 사용한다.
+    assert analysis.generated_by == "template"
+    assert analysis.core_summary
+    assert analysis.key_changes
+    assert analysis.industry_insights
+    assert analysis.korea_implications
+    assert analysis.outlook
+
     assert hero_story.title
     assert hero_story.selection_reason
-    assert hero_story.visual_message
-
-    for insight in insights:
-        assert insight.what_happened
-        assert insight.why_it_matters
-        assert insight.implication_for_korea
-        assert insight.implication_for_lg
-        assert insight.recommended_actions.immediate
-        assert insight.recommended_actions.thirty_days
-        assert insight.recommended_actions.ninety_days
-

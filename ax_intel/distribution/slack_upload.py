@@ -36,7 +36,6 @@ def upload_slack(context: RunContext) -> SlackSendResult:
     client = WebClient(token=_env("SLACK_BOT_TOKEN"))
     subject = f"[AX Commerce Intelligence] {run_date.strftime('%Y.%m.%d')} Daily Brief"
 
-    hero_image_ts: Optional[str] = None
     pdf_ts: Optional[str] = None
     message_ts: Optional[str] = None
 
@@ -52,22 +51,7 @@ def upload_slack(context: RunContext) -> SlackSendResult:
     resp = client.chat_postMessage(channel=channel_id, text=text, mrkdwn=True)
     message_ts = resp["ts"]
 
-    # 2. Upload hero image as reply (best-effort)
-    hero_path: Path = context.output_paths["hero_image"]
-    if hero_path.exists():
-        try:
-            resp = client.files_upload_v2(
-                channel=channel_id,
-                file=str(hero_path),
-                filename=hero_path.name,
-                title=f"Hero Visual — {subject}",
-                thread_ts=message_ts,
-            )
-            hero_image_ts = resp.get("file", {}).get("id")
-        except Exception as exc:
-            print(f"[WARN] Hero image upload skipped: {exc}", file=sys.stderr)
-
-    # 3. Upload report.pdf as reply (best-effort)
+    # 2. Upload report.pdf as reply (best-effort)
     pdf_path: Path = context.output_paths["report_pdf"]
     if pdf_path.exists():
         try:
@@ -87,7 +71,6 @@ def upload_slack(context: RunContext) -> SlackSendResult:
         channel_id=channel_id,
         channel_name=channel_id,
         message_ts=message_ts,
-        hero_image_ts=hero_image_ts,
         pdf_ts=pdf_ts,
         status="sent",
         sent_at=datetime.now(timezone.utc),

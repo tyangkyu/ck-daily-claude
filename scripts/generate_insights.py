@@ -31,14 +31,16 @@ def main() -> int:
         Signal.model_validate(signal)
         for signal in read_json(context.output_paths["signals"])
     ]
-    insights, hero_story = generate_phase6_outputs(signals, clean_items)
-
-    write_json(
-        context.output_paths["insights"],
-        [insight.model_dump(mode="json") for insight in insights],
+    analysis, hero_story = generate_phase6_outputs(
+        signals,
+        clean_items,
+        run_date=context.run_date,
+        use_llm=not context.dry_run,
     )
+
+    write_json(context.output_paths["daily_analysis"], analysis.model_dump(mode="json"))
     write_json(context.output_paths["hero_story"], hero_story.model_dump(mode="json"))
-    print(context.output_paths["insights"])
+    print(context.output_paths["daily_analysis"])
     print(context.output_paths["hero_story"])
     return 0
 
